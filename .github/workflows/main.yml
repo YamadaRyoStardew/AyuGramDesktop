@@ -1,0 +1,56 @@
+name: Build AyuGram Desktop (Linux Docker)
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    name: 🐧 Build Linux (Docker)
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies on runner
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            docker.io \
+            python3 \
+            python3-pip
+
+      - name: Install Poetry
+        run: |
+          pip3 install --user poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Prepare Telegram Desktop build environment
+        run: |
+          ./Telegram/build/prepare/linux.sh
+
+      - name: Build AyuGram Desktop (Release)
+        run: |
+          docker run --rm \
+            -u $(id -u) \
+            -v "$PWD:/usr/src/tdesktop" \
+            ghcr.io/telegramdesktop/tdesktop/centos_env:latest \
+            /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+            -D TDESKTOP_API_ID=2040 \
+            -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+
+      - name: Strip binaries (optional)
+        run: |
+          find out -type f -executable -exec strip --strip-unneeded {} + || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGramDesktop-Linux
+          path: out/
